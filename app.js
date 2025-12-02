@@ -2666,38 +2666,48 @@ function setupEventListeners() {
 }
 
 function handleDefaultPreset(presetType) {
-    const t = translations[currentLang];
-    const presets = {
-        'countdown-1m': { mode: 'countdown', duration: 60, nameKey: 'presetCountdown1m', time: '1m' },
-        'countdown-3m': { mode: 'countdown', duration: 180, nameKey: 'presetCountdown3m', time: '3m' },
-        'countup-1m': { mode: 'countup', duration: 60, nameKey: 'presetCountup1m', time: '1m' },
-        'countup-3m': { mode: 'countup', duration: 180, nameKey: 'presetCountup3m', time: '3m' }
-    };
-    
-    const preset = presets[presetType];
-    if (!preset) return;
-    
-    const totalMs = preset.duration * 1000;
-    const timerName = `${t[preset.nameKey]} ${preset.time}`;
-    
-    const timer = {
-        id: generateId(),
-        name: timerName,
-        mode: preset.mode,
-        initialDuration: totalMs,
-        lastRemaining: preset.mode === 'countdown' ? totalMs : 0,
-        lastElapsed: preset.mode === 'countup' ? 0 : 0,
-        isRunning: false,
-        soundOn: settings.notificationsByDefault !== false,
-        notificationOn: settings.notificationsByDefault !== false,
-        customSound: settings.defaultSound || '',
-        createdAt: Date.now()
-    };
-    
-    timers.set(timer.id, timer);
-    sendToWorker('add', { timer });
-    saveTimers();
-    renderAllTimers();
+    try {
+        const t = translations[currentLang];
+        const presets = {
+            'countdown-1m': { mode: 'countdown', duration: 60, nameKey: 'presetCountdown1m', time: '1m' },
+            'countdown-3m': { mode: 'countdown', duration: 180, nameKey: 'presetCountdown3m', time: '3m' },
+            'countup-1m': { mode: 'countup', duration: 60, nameKey: 'presetCountup1m', time: '1m' },
+            'countup-3m': { mode: 'countup', duration: 180, nameKey: 'presetCountup3m', time: '3m' }
+        };
+        
+        const preset = presets[presetType];
+        if (!preset) {
+            console.error('Preset not found:', presetType);
+            return;
+        }
+        
+        const totalMs = preset.duration * 1000;
+        const timerName = `${t[preset.nameKey]} ${preset.time}`;
+        
+        const timer = {
+            id: uid(),
+            name: timerName,
+            mode: preset.mode,
+            initialDuration: totalMs,
+            lastRemaining: preset.mode === 'countdown' ? totalMs : 0,
+            lastElapsed: preset.mode === 'countup' ? 0 : 0,
+            isRunning: false,
+            soundOn: settings.notificationsByDefault !== false,
+            notificationOn: settings.notificationsByDefault !== false,
+            customSound: settings.defaultSound || '',
+            createdAt: Date.now()
+        };
+        
+        console.log('Creating timer from preset:', presetType, timer);
+        
+        timers.set(timer.id, timer);
+        sendToWorker('add', { timer });
+        saveTimers();
+        renderAllTimers();
+    } catch (error) {
+        console.error('Error in handleDefaultPreset:', error);
+        alert('Có lỗi khi tạo timer từ mẫu. Vui lòng thử lại.');
+    }
 }
 
 // ===== Initialization =====
