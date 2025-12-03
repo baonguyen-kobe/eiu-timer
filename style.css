@@ -1689,22 +1689,90 @@ kbd {
 
 /* Responsive Design */
 @media (max-width: 768px) {
+    :root {
+        --spacing-xl: 1.5rem;
+        --spacing-lg: 1rem;
+    }
+
     .container {
-        padding: 0 var(--spacing-md);
+        padding: 0 var(--spacing-sm);
     }
 
     .header-content {
         flex-direction: column;
-        gap: var(--spacing-md);
+        gap: var(--spacing-sm);
+        padding: var(--spacing-sm) 0;
+        align-items: stretch;
+    }
+
+    .logo {
+        gap: var(--spacing-xs);
+        justify-content: center;
+    }
+
+    .logo-icon {
+        width: 24px;
+        height: 24px;
+    }
+
+    .logo h1 {
+        font-size: 1.1rem;
     }
 
     .header-actions {
         width: 100%;
-        justify-content: space-between;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .header-actions .btn {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.6rem;
+        white-space: nowrap;
+    }
+
+    .header-actions .btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .btn-text {
+        display: none;
     }
 
     .timers-grid {
         grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .timer-card {
+        padding: var(--spacing-md);
+    }
+
+    .time-units-grid {
+        gap: var(--spacing-sm);
+    }
+
+    .time-unit-value {
+        font-size: 2rem;
+        padding: var(--spacing-sm);
+    }
+
+    .time-unit-label {
+        font-size: 0.7rem;
+    }
+
+    .timer-controls {
+        gap: var(--spacing-sm);
+    }
+
+    .timer-controls .btn {
+        padding: 0.6rem;
+    }
+
+    .quick-adjust {
+        gap: var(--spacing-xs);
     }
 
     .time-large {
@@ -1712,24 +1780,202 @@ kbd {
     }
 
     .modal-content {
-        margin: var(--spacing-md);
+        margin: var(--spacing-sm);
+        padding: var(--spacing-md);
+        max-width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header h2 {
+        font-size: 1.25rem;
+    }
+
+    .time-inputs-grid {
+        gap: var(--spacing-sm);
+    }
+
+    .time-input-wrapper {
+        padding: 0.5rem;
+    }
+
+    .time-input {
+        font-size: 1.25rem;
+    }
+
+    .time-label {
+        font-size: 0.7rem;
     }
 
     .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: 1fr;
     }
     
     .selection-toolbar {
         flex-wrap: wrap;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
+        gap: var(--spacing-xs);
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .selection-toolbar .btn {
+        font-size: 0.75rem;
+        padding: 0.35rem 0.6rem;
     }
     
     .presentation-grid.multiple {
         grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+    
+    .presentation-grid.single .presentation-card {
+        padding: var(--spacing-lg);
+        max-width: 100%;
+    }
+    
+    .presentation-grid.single .presentation-timer-name {
+        font-size: 2rem;
+    }
+    
+    .presentation-grid.single .time-units-grid {
+        gap: var(--spacing-md);
+        width: 100%;
+    }
+    
+    .presentation-grid.single .time-unit {
+        flex: 1;
+        max-width: none;
+    }
+    
+    .presentation-grid.single .time-unit-box {
+        min-height: 120px;
+        padding: var(--spacing-md);
     }
     
     .presentation-grid.single .time-large {
-        font-size: 4rem;
+        font-size: 3rem;
+    }
+    
+    .presentation-grid.single .time-unit-label {
+        font-size: 0.9rem;
+    }
+
+    .presentation-controls {
+        gap: var(--spacing-sm);
+    }
+
+    .presets-bar {
+        padding: var(--spacing-sm) 0;
+    }
+
+    .presets-inline {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        align-items: stretch;
+    }
+
+    .presets-inline h3 {
+        font-size: 0.95rem;
+        text-align: left;
+    }
+
+    .presets-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+    }
+
+    .preset-card {
+        padding: 8px 4px;
+        font-size: 0.7rem;
+    }
+
+    .preset-card .preset-icon {
+        font-size: 1.1rem;
+    }
+
+    .preset-card .preset-time {
+        font-size: 0.7rem;
+    }
+
+    .empty-state h2 {
+        font-size: 1.5rem;
+    }
+
+    .empty-state p {
+        font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .logo-icon {
+        width: 24px;
+        height: 24px;
+    }
+
+    .logo h1 {
+        font-size: 1.1rem;
+    }
+
+    .time-unit-value {
+        font-size: 1.75rem;
+    }
+
+    .modal-content {
+        margin: 0;
+        border-radius: 0;
+        max-height: 100vh;
+    }
+
+    .presentation-grid {
+        padding: var(--spacing-md);
+    }
+
+    .presentation-grid.single .presentation-card {
+        padding: var(--spacing-md);
+    }
+    
+    .presentation-grid.single .presentation-timer-name {
+        font-size: 1.2rem;
+    }
+    
+    .presentation-grid.single .time-units-grid {
+        gap: var(--spacing-xs);
+        width: 100%;
+    }
+    
+    .presentation-grid.single .time-unit {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .presentation-grid.single .time-unit-box {
+        min-height: 100px;
+        padding: var(--spacing-xs);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .presentation-grid.single .time-large {
+        font-size: 2rem;
+    }
+    
+    .presentation-grid.single .time-unit-label {
+        font-size: 0.7rem;
+    }
+    
+    .presentation-grid.single .btn-icon {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .presentation-grid.single .btn-icon svg {
+        width: 36px !important;
+        height: 36px !important;
+    }
+
+    .time-inputs-grid {
+        grid-template-columns: 1fr;
     }
 }
 
