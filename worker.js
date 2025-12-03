@@ -162,10 +162,10 @@ function startTicker() {
                 if (timer.isRunning) {
                     elapsed = now - (timer.startTime ?? now);
                     // Check if target is reached (if set)
-                    if (timer.initialDuration && elapsed >= timer.initialDuration) {
+                    if (timer.targetDuration && elapsed >= timer.targetDuration) {
                         completed = true;
                         timer.isRunning = false;
-                        timer.lastElapsed = timer.initialDuration;
+                        timer.lastElapsed = timer.targetDuration;
                     }
                 } else {
                     elapsed = timer.lastElapsed ?? 0;
@@ -179,6 +179,7 @@ function startTicker() {
                 isRunning: timer.isRunning,
                 mode: timer.mode,
                 initialDuration: timer.initialDuration,
+                targetDuration: timer.targetDuration,
                 completed
             });
         });
