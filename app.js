@@ -402,7 +402,13 @@ function loadTimers() {
         const data = localStorage.getItem(STORAGE_KEY);
         if (data) {
             const timersArray = JSON.parse(data);
-            timers = new Map(timersArray.map(t => [t.id, t]));
+            timers = new Map(timersArray.map(t => {
+                // Clean up any editing state that might have been saved
+                delete t.__editing;
+                delete t.__el;
+                delete t.__el_presentation;
+                return [t.id, t];
+            }));
         }
     } catch (e) {
         console.error('Error loading timers:', e);
@@ -780,8 +786,8 @@ function createTimerCard(timer) {
     if (timer.isRunning) card.classList.add('running');
     if (selectedTimers.has(timer.id)) card.classList.add('selected');
     
-    // Check if card is in edit mode - force false to prevent stuck editing state
-    const isEditing = false; // timer.__editing;
+    // Check if card is in edit mode
+    const isEditing = timer.__editing === true;
     
     // Calculate initial display time components
     let totalMs = 0;
