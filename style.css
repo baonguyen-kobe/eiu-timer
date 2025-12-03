@@ -885,11 +885,18 @@ body {
 
 .modal-body {
     padding: var(--spacing-lg);
+    overflow-x: hidden;
+}
+
+.modal-body * {
+    max-width: 100%;
 }
 
 /* Form Styles */
 .form-group {
     margin-bottom: var(--spacing-md);
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .form-group label {
@@ -909,6 +916,14 @@ body {
     color: var(--text-primary);
     font-size: 1rem;
     transition: all var(--transition-fast);
+}
+
+.form-control select,
+select.form-control {
+    max-width: 100%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .form-control:focus {
@@ -1017,10 +1032,19 @@ body {
     display: flex;
     gap: var(--spacing-sm);
     align-items: center;
+    width: 100%;
 }
 
 .sound-controls .form-control {
     flex: 1;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.sound-controls select {
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .sound-controls .btn {
@@ -1599,8 +1623,8 @@ kbd {
 
 .edit-sound-controls {
     display: flex;
+    flex-direction: column;
     gap: var(--spacing-sm);
-    align-items: center;
     padding: var(--spacing-sm);
     background: var(--bg-hover);
     border-radius: var(--radius-md);
@@ -1619,13 +1643,31 @@ kbd {
 }
 
 .edit-sound-select {
-    flex: 1;
+    width: 100%;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     padding: 4px 8px;
     color: var(--text-primary);
     font-size: 0.85rem;
+}
+
+.edit-sound-controls .sound-row-top {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+    width: 100%;
+}
+
+.edit-sound-controls .sound-row-top .edit-sound-select {
+    flex: 1;
+}
+
+.edit-sound-controls .sound-row-bottom {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+    justify-content: flex-start;
 }
 
 .edit-sound-select:disabled {
@@ -1645,8 +1687,17 @@ kbd {
 
 .edit-actions {
     display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.edit-actions .checkbox-label {
+    margin: 0;
+}
+
+.edit-buttons-group {
+    display: flex;
     gap: var(--spacing-sm);
-    justify-content: flex-end;
 }
 
 /* ===== Present Button ===== */
