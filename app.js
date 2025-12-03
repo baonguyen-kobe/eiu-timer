@@ -25,9 +25,11 @@ const translations = {
         countdown: 'Đếm Ngược',
         countup: 'Đếm Lên',
         duration: 'Thời Lượng',
+        startFrom: 'Đếm từ',
         targetTime: 'Mục Tiêu (Tùy chọn)',
         countdownHint: 'Thời gian đếm ngược',
-        countupHint: 'Thời gian mục tiêu để đếm lên. Để trống nếu không cần.',
+        startFromHint: 'Thời gian bắt đầu đếm lên. Để trống nếu bắt đầu từ 00:00:00.',
+        targetTimeHint: 'Thời gian mục tiêu để kết thúc. Để trống nếu đếm vô hạn.',
         hours: 'Giờ',
         minutes: 'Phút',
         seconds: 'Giây',
@@ -110,6 +112,8 @@ const translations = {
         emptyStateTitle: 'Chưa có bộ đếm nào',
         emptyStateDesc: 'Nhấn "Tạo Mới" hoặc chọn mẫu có sẵn để bắt đầu',
         emptyStateBtn: 'Tạo Bộ Đếm Đầu Tiên',
+        fullscreen: 'Toàn màn hình',
+        exitFullscreen: 'Thoát toàn màn hình',
     },
     en: {
         appTitle: 'EIU Timer Pro',
@@ -130,9 +134,11 @@ const translations = {
         countdown: 'Countdown',
         countup: 'Count Up',
         duration: 'Duration',
+        startFrom: 'Start From',
         targetTime: 'Target Time (Optional)',
         countdownHint: 'Countdown duration',
-        countupHint: 'Target time to count up to. Leave empty if not needed.',
+        startFromHint: 'Starting time to count up from. Leave empty to start from 00:00:00.',
+        targetTimeHint: 'Target time to end at. Leave empty for unlimited counting.',
         hours: 'Hours',
         minutes: 'Minutes',
         seconds: 'Seconds',
@@ -215,6 +221,8 @@ const translations = {
         emptyStateTitle: 'No timers yet',
         emptyStateDesc: 'Click "Create" or choose a template to get started',
         emptyStateBtn: 'Create Your First Timer',
+        fullscreen: 'Fullscreen',
+        exitFullscreen: 'Exit fullscreen',
     }
 };
 
@@ -279,7 +287,13 @@ const elements = {
     // Presentation Mode
     presentationMode: document.getElementById('presentationMode'),
     exitPresentationBtn: document.getElementById('exitPresentationBtn'),
+    fullscreenToggleBtn: document.getElementById('fullscreenToggleBtn'),
     presentationGrid: document.getElementById('presentationGrid'),
+    
+    // Shortcuts Modal
+    shortcutsModal: document.getElementById('shortcutsModal'),
+    shortcutsModalClose: document.getElementById('shortcutsModalClose'),
+    shortcutsModalOverlay: document.getElementById('shortcutsModalOverlay'),
     
     // Modal
     timerModal: document.getElementById('timerModal'),
@@ -294,6 +308,11 @@ const elements = {
     timerHours: document.getElementById('timerHours'),
     timerMinutes: document.getElementById('timerMinutes'),
     timerSeconds: document.getElementById('timerSeconds'),
+    targetTimeGroup: document.getElementById('targetTimeGroup'),
+    targetHours: document.getElementById('targetHours'),
+    targetMinutes: document.getElementById('targetMinutes'),
+    targetSeconds: document.getElementById('targetSeconds'),
+    targetTimeHint: document.getElementById('targetTimeHint'),
     enableSound: document.getElementById('enableSound'),
     customSound: document.getElementById('customSound'),
     soundFileInput: document.getElementById('soundFileInput'),
@@ -477,7 +496,12 @@ function initWorker() {
         console.warn('Worker not available, timers may not work in background');
         return;
     }
-    const timersArray = Array.from(timers.values());
+    const timersArray = Array.from(timers.values()).map(t => ({
+        ...t,
+        __el: undefined,
+        __editing: undefined,
+        __el_presentation: undefined
+    }));
     sendToWorker('init', { timers: timersArray });
 }
 
@@ -742,7 +766,8 @@ function createTimerCard(timer) {
     if (timer.mode === 'countdown') {
         totalMs = timer.lastRemaining ?? timer.initialDuration ?? 0;
     } else if (timer.mode === 'countup') {
-        totalMs = timer.lastElapsed ?? 0;
+        // For countup: show initialDuration + elapsed time
+        totalMs = (timer.initialDuration ?? 0) + (timer.lastElapsed ?? 0);
     }
     
     const totalSeconds = Math.floor(totalMs / 1000);
@@ -798,9 +823,6 @@ function createTimerCard(timer) {
         card.innerHTML = `
             <div class="select-checkbox"></div>
             <div class="timer-header">
-                <div class="timer-info">
-                    <h3 class="timer-name">${escapeHtml(timer.name)}</h3>
-                </div>
                 <div class="timer-actions">
                     <button class="btn btn-tiny btn-secondary present-btn" title="${translations[currentLang].present}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -822,6 +844,10 @@ function createTimerCard(timer) {
                         </svg>
                     </button>
                 </div>
+            </div>
+            
+            <div class="timer-info">
+                <h3 class="timer-name">${escapeHtml(timer.name)}</h3>
             </div>
             
             <div class="timer-display">
@@ -1037,11 +1063,13 @@ function updateTimerCard(id, snapshot) {
         // Calculate time values
         let totalMs = 0;
         if (snapshot.mode === 'countup') {
-            totalMs = snapshot.elapsed || 0;
+            // For countup: show initialDuration + elapsed
+            const initialDuration = snapshot.initialDuration || timer.initialDuration || 0;
+            totalMs = initialDuration + (snapshot.elapsed || 0);
             
             // Calculate progress for countup
-            if (progressBar && snapshot.initialDuration) {
-                const progress = Math.min(100, (totalMs / snapshot.initialDuration) * 100);
+            if (progressBar && snapshot.targetDuration) {
+                const progress = Math.min(100, (totalMs / snapshot.targetDuration) * 100);
                 progressBar.style.width = `${progress}%`;
                 progressBar.setAttribute('aria-valuenow', Math.round(progress));
             } else if (progressBar) {
@@ -1400,6 +1428,9 @@ function enterPresentationMode(timersToPresent) {
         const card = createPresentationTimerCard(timer);
         elements.presentationGrid.appendChild(card);
     });
+    
+    // Request fullscreen
+    requestFullscreen();
 }
 
 function createPresentationTimerCard(timer) {
@@ -1413,7 +1444,8 @@ function createPresentationTimerCard(timer) {
     if (timer.mode === 'countdown') {
         totalMs = timer.lastRemaining ?? timer.initialDuration ?? 0;
     } else if (timer.mode === 'countup') {
-        totalMs = timer.lastElapsed ?? 0;
+        // For countup: always show target duration for initial display (not elapsed)
+        totalMs = timer.targetDuration ?? 0;
     }
     
     const totalSeconds = Math.floor(totalMs / 1000);
@@ -1499,8 +1531,44 @@ function exitPresentationMode() {
     elements.presentationMode.classList.add('hidden');
     elements.presentationGrid.innerHTML = '';
     
+    // Exit fullscreen if active
+    if (document.fullscreenElement) {
+        exitFullscreen();
+    }
+    
     // Re-render main grid to restore normal state
     renderAllTimers();
+}
+
+function requestFullscreen() {
+    const elem = elements.presentationMode;
+    if (elem.requestFullscreen) {
+        elem.requestFullscreen().catch(err => {
+            console.log('Fullscreen request failed:', err);
+        });
+    } else if (elem.webkitRequestFullscreen) {
+        elem.webkitRequestFullscreen();
+    } else if (elem.msRequestFullscreen) {
+        elem.msRequestFullscreen();
+    }
+}
+
+function exitFullscreen() {
+    if (document.exitFullscreen) {
+        document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+    } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+    }
+}
+
+function toggleFullscreen() {
+    if (document.fullscreenElement) {
+        exitFullscreen();
+    } else {
+        requestFullscreen();
+    }
 }
 
 // ===== Tick Handler =====
@@ -1526,8 +1594,11 @@ function openAddModal() {
     elements.timerForm.reset();
     elements.timerMode.value = 'countdown';
     elements.timerHours.value = 0;
-    elements.timerMinutes.value = 25;
+    elements.timerMinutes.value = 0;
     elements.timerSeconds.value = 0;
+    elements.targetHours.value = 0;
+    elements.targetMinutes.value = 0;
+    elements.targetSeconds.value = 0;
     elements.enableSound.checked = true;
     elements.enableNotification.checked = true;
     
@@ -1642,8 +1713,11 @@ function openEditModal(id) {
     
     // Reset all time inputs first
     elements.timerHours.value = 0;
-    elements.timerMinutes.value = 25;
+    elements.timerMinutes.value = 0;
     elements.timerSeconds.value = 0;
+    elements.targetHours.value = 0;
+    elements.targetMinutes.value = 0;
+    elements.targetSeconds.value = 0;
     
     // Set time based on mode and current timer state
     if (timer.mode === 'countdown') {
@@ -1656,7 +1730,7 @@ function openEditModal(id) {
         elements.timerMinutes.value = minutes;
         elements.timerSeconds.value = seconds;
     } else if (timer.mode === 'countup') {
-        // For countup, show the initial duration if set
+        // For countup, show "Đếm từ" (initialDuration)
         if (timer.initialDuration) {
             const totalSeconds = Math.floor(timer.initialDuration / 1000);
             const hours = Math.floor(totalSeconds / 3600);
@@ -1666,10 +1740,18 @@ function openEditModal(id) {
             elements.timerHours.value = hours;
             elements.timerMinutes.value = minutes;
             elements.timerSeconds.value = seconds;
-        } else {
-            elements.timerHours.value = 0;
-            elements.timerMinutes.value = 0;
-            elements.timerSeconds.value = 0;
+        }
+        
+        // Show "Mục Tiêu" (targetDuration)
+        if (timer.targetDuration) {
+            const targetTotalSeconds = Math.floor(timer.targetDuration / 1000);
+            const targetHours = Math.floor(targetTotalSeconds / 3600);
+            const targetMinutes = Math.floor((targetTotalSeconds % 3600) / 60);
+            const targetSeconds = targetTotalSeconds % 60;
+            
+            elements.targetHours.value = targetHours;
+            elements.targetMinutes.value = targetMinutes;
+            elements.targetSeconds.value = targetSeconds;
         }
     }
     
@@ -1693,9 +1775,14 @@ function updateTimeLabelAndHint() {
     if (mode === 'countdown') {
         elements.timeLabelText.textContent = t.duration;
         elements.timeHint.textContent = t.countdownHint;
+        elements.targetTimeGroup.style.display = 'none';
     } else if (mode === 'countup') {
-        elements.timeLabelText.textContent = t.targetTime;
-        elements.timeHint.textContent = t.countupHint;
+        elements.timeLabelText.textContent = t.startFrom;
+        elements.timeHint.textContent = t.startFromHint;
+        elements.targetTimeGroup.style.display = 'block';
+        if (elements.targetTimeHint) {
+            elements.targetTimeHint.textContent = t.targetTimeHint;
+        }
     }
 }
 
@@ -1721,6 +1808,12 @@ function handleFormSubmit(e) {
     const seconds = parseInt(elements.timerSeconds.value) || 0;
     const totalMs = (hours * 3600 + minutes * 60 + seconds) * 1000;
     
+    // Get target time values for countup mode
+    const targetHours = parseInt(elements.targetHours?.value) || 0;
+    const targetMinutes = parseInt(elements.targetMinutes?.value) || 0;
+    const targetSeconds = parseInt(elements.targetSeconds?.value) || 0;
+    const targetMs = (targetHours * 3600 + targetMinutes * 60 + targetSeconds) * 1000;
+    
     let timerData = {
         name,
         mode,
@@ -1739,8 +1832,10 @@ function handleFormSubmit(e) {
         timerData.initialDuration = totalMs;
         timerData.lastRemaining = totalMs;
     } else if (mode === 'countup') {
-        // For countup, duration is optional (target time)
-        timerData.initialDuration = totalMs > 0 ? totalMs : null;
+        // initialDuration = "Đếm từ" (start time)
+        // targetDuration = "Mục Tiêu" (end time)
+        timerData.initialDuration = totalMs; // Can be 0 to start from 00:00:00
+        timerData.targetDuration = targetMs > 0 ? targetMs : null; // null = unlimited
         timerData.lastElapsed = 0;
     }
     
@@ -1797,7 +1892,7 @@ function handleFormSubmit(e) {
         
         try {
             timers.set(id, newTimer);
-            sendToWorker('add', { timer: newTimer });
+            sendToWorker('add', { timer: { ...newTimer, __el: undefined, __editing: undefined } });
             
             saveTimers();
             renderAllTimers();
@@ -2113,10 +2208,14 @@ function updateLanguage() {
     if (manageBtnText) manageBtnText.textContent = t.manage;
     
     // Update selection toolbar
-    const presentBtn = document.querySelector('#presentSelectedBtn span:last-child');
-    const deleteBtn = document.querySelector('#deleteSelectedBtn span:last-child');
-    if (presentBtn) presentBtn.textContent = t.present;
-    if (deleteBtn) deleteBtn.textContent = t.delete;
+    const presentBtn = document.querySelector('#presentSelectedBtn');
+    const deleteBtn = document.querySelector('#deleteSelectedBtn');
+    if (presentBtn) {
+        presentBtn.textContent = t.present;
+    }
+    if (deleteBtn) {
+        deleteBtn.textContent = t.delete;
+    }
     
     // Update time unit labels in all timer cards
     document.querySelectorAll('.time-unit-label span:not(.material-symbols-outlined)').forEach(label => {
@@ -2317,6 +2416,10 @@ function showStats() {
     showModal(elements.statsModal);
 }
 
+function openShortcutsModal() {
+    showModal(elements.shortcutsModal);
+}
+
 // ===== Settings Functions =====
 function showSettings() {
     const t = translations[currentLang];
@@ -2512,6 +2615,9 @@ function handleKeyPress(e) {
         case 'p':
             togglePresets();
             break;
+        case '?':
+            openShortcutsModal();
+            break;
         case 's':
             if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
@@ -2521,6 +2627,8 @@ function handleKeyPress(e) {
         case 'escape':
             if (isPresentationMode) {
                 exitPresentationMode();
+            } else if (elements.shortcutsModal.classList.contains('active')) {
+                closeModal(elements.shortcutsModal);
             } else if (elements.timerModal.classList.contains('active')) {
                 closeModal(elements.timerModal);
             } else if (elements.statsModal.classList.contains('active')) {
@@ -2552,6 +2660,7 @@ function setupEventListeners() {
     
     // Presentation Mode
     elements.exitPresentationBtn.addEventListener('click', exitPresentationMode);
+    elements.fullscreenToggleBtn.addEventListener('click', toggleFullscreen);
     
     // Sound Controls
     elements.enableSound.addEventListener('change', (e) => {
@@ -2641,6 +2750,10 @@ function setupEventListeners() {
     elements.statsModalClose.addEventListener('click', () => closeModal(elements.statsModal));
     elements.statsModalOverlay.addEventListener('click', () => closeModal(elements.statsModal));
     
+    // Shortcuts Modal
+    elements.shortcutsModalClose.addEventListener('click', () => closeModal(elements.shortcutsModal));
+    elements.shortcutsModalOverlay.addEventListener('click', () => closeModal(elements.shortcutsModal));
+    
     // Presets Management
     elements.managePresetsBtn.addEventListener('click', showPresetsManager);
     elements.presetsModalClose.addEventListener('click', () => closeModal(elements.presetsModal));
@@ -2663,6 +2776,23 @@ function setupEventListeners() {
     
     // Keyboard shortcuts
     document.addEventListener('keydown', handleKeyPress);
+    
+    // Fullscreen change listener to update button text
+    document.addEventListener('fullscreenchange', updateFullscreenButton);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+    document.addEventListener('msfullscreenchange', updateFullscreenButton);
+}
+
+function updateFullscreenButton() {
+    const fullscreenText = elements.fullscreenToggleBtn?.querySelector('.fullscreen-text');
+    if (!fullscreenText) return;
+    
+    const t = translations[currentLang];
+    if (document.fullscreenElement) {
+        fullscreenText.textContent = t.exitFullscreen || 'Thoát toàn màn hình';
+    } else {
+        fullscreenText.textContent = t.fullscreen || 'Toàn màn hình';
+    }
 }
 
 function handleDefaultPreset(presetType) {
@@ -2689,6 +2819,7 @@ function handleDefaultPreset(presetType) {
             name: timerName,
             mode: preset.mode,
             initialDuration: totalMs,
+            targetDuration: preset.mode === 'countup' ? totalMs : null,
             lastRemaining: preset.mode === 'countdown' ? totalMs : 0,
             lastElapsed: preset.mode === 'countup' ? 0 : 0,
             isRunning: false,
@@ -2701,7 +2832,7 @@ function handleDefaultPreset(presetType) {
         console.log('Creating timer from preset:', presetType, timer);
         
         timers.set(timer.id, timer);
-        sendToWorker('add', { timer });
+        sendToWorker('add', { timer: { ...timer, __el: undefined, __editing: undefined } });
         saveTimers();
         renderAllTimers();
     } catch (error) {
