@@ -1836,7 +1836,10 @@ function handleFormSubmit(e) {
         // targetDuration = "Mục Tiêu" (end time)
         timerData.initialDuration = totalMs; // Can be 0 to start from 00:00:00
         timerData.targetDuration = targetMs > 0 ? targetMs : null; // null = unlimited
-        timerData.lastElapsed = 0;
+        // Keep lastElapsed if editing, otherwise start fresh
+        if (!editingId) {
+            timerData.lastElapsed = 0;
+        }
     }
     
     if (editingId) {
@@ -1848,6 +1851,8 @@ function handleFormSubmit(e) {
             editingId = null;
             return;
         }
+        
+        console.log('Updating timer:', editingId, 'with data:', timerData);
         
         try {
             const wasRunning = timer.isRunning;
@@ -1861,7 +1866,7 @@ function handleFormSubmit(e) {
             Object.assign(timer, timerData);
             
             // Create clean timer object for worker (without DOM reference)
-            const cleanTimer = { ...timer, __el: undefined };
+            const cleanTimer = { ...timer, __el: undefined, __editing: undefined };
             
             // Update worker with new timer data
             sendToWorker('update', { timer: cleanTimer });
@@ -1874,6 +1879,8 @@ function handleFormSubmit(e) {
             saveTimers();
             renderAllTimers();
             initWorker();
+            
+            console.log('Timer updated successfully');
         } catch (err) {
             console.error('Error updating timer:', err);
         }
@@ -1881,6 +1888,7 @@ function handleFormSubmit(e) {
         // Always close modal
         elements.timerModal.classList.remove('active');
         editingId = null;
+        console.log('Modal closed, editingId reset');
     } else {
         // Create new timer
         const id = uid();
