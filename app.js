@@ -3,6 +3,7 @@ const STORAGE_KEY = 'eiu_timer_pro_v1';
 const STATS_KEY = 'eiu_timer_stats_v1';
 const PRESETS_KEY = 'eiu_timer_presets_v1';
 const SETTINGS_KEY = 'eiu_timer_settings_v1';
+const CUSTOM_SOUNDS_KEY = 'eiu_timer_custom_sounds_v1';
 
 // Language translations
 const translations = {
@@ -257,7 +258,7 @@ const soundLibrary = {
 // Track if 3-second warning has been played
 const warningPlayed = new Set();
 
-// Custom uploaded sounds
+// Custom uploaded sounds - store both data and filename
 let customSounds = {};
 
 // DOM Elements
@@ -429,6 +430,71 @@ function loadPresets() {
     } catch (e) {
         console.error('Error loading presets:', e);
         customPresets = [];
+    }
+}
+
+function saveCustomSounds() {
+    localStorage.setItem(CUSTOM_SOUNDS_KEY, JSON.stringify(customSounds));
+}
+
+function loadCustomSounds() {
+    try {
+        const data = localStorage.getItem(CUSTOM_SOUNDS_KEY);
+        if (data) {
+            const loadedSounds = JSON.parse(data);
+            
+            // Clean up old format and only keep new format with filename
+            customSounds = {};
+            Object.keys(loadedSounds).forEach(soundId => {
+                const soundInfo = loadedSounds[soundId];
+                // Only keep sounds with the new format (object with data and name)
+                if (typeof soundInfo === 'object' && soundInfo.data && soundInfo.name) {
+                    customSounds[soundId] = soundInfo;
+                }
+                // Skip old format (just string data without filename)
+            });
+            
+            // Save cleaned up version
+            if (Object.keys(customSounds).length > 0) {
+                saveCustomSounds();
+            }
+            
+            // Restore custom sound options in dropdowns
+            Object.keys(customSounds).forEach(soundId => {
+                const soundInfo = customSounds[soundId];
+                const soundName = soundInfo.name;
+                const displayName = shortenFileName(soundName, 15);
+                
+                // Add to timer creation dropdown
+                if (elements.customSound) {
+                    const existingOption = elements.customSound.querySelector(`option[value="${soundId}"]`);
+                    if (!existingOption) {
+                        const option = document.createElement('option');
+                        option.value = soundId;
+                        option.textContent = `📁 ${displayName}`;
+                        option.title = soundName;
+                        option.setAttribute('data-custom', 'true');
+                        elements.customSound.appendChild(option);
+                    }
+                }
+                
+                // Add to default sound dropdown
+                if (elements.defaultSound) {
+                    const existingOption = elements.defaultSound.querySelector(`option[value="${soundId}"]`);
+                    if (!existingOption) {
+                        const option = document.createElement('option');
+                        option.value = soundId;
+                        option.textContent = `📁 ${displayName}`;
+                        option.title = soundName;
+                        option.setAttribute('data-custom', 'true');
+                        elements.defaultSound.appendChild(option);
+                    }
+                }
+            });
+        }
+    } catch (e) {
+        console.error('Error loading custom sounds:', e);
+        customSounds = {};
     }
 }
 
@@ -710,7 +776,9 @@ function playSoundByType(soundType) {
         playTickSound();
     } else if (customSounds[soundType]) {
         // Custom uploaded sound
-        const audio = new Audio(customSounds[soundType]);
+        const soundInfo = customSounds[soundType];
+        const soundData = typeof soundInfo === 'object' ? soundInfo.data : soundInfo;
+        const audio = new Audio(soundData);
         audio.play().catch(err => {
             console.error('Failed to play custom sound:', err);
             playBeep(); // Fallback to beep
@@ -727,15 +795,52 @@ function handleSoundFileUpload(file, isDefault = false) {
     reader.onload = (e) => {
         const soundData = e.target.result;
         const soundId = `custom_${Date.now()}`;
-        customSounds[soundId] = soundData;
+        customSounds[soundId] = {
+            data: soundData,
+            name: file.name
+        };
         
         if (isDefault) {
             settings.defaultSound = soundId;
             saveSettings();
-            elements.defaultSound.value = 'custom';
+            // Update default sound dropdown to show custom was selected
+            if (elements.defaultSound) {
+                // Remove old custom option if exists
+                const oldCustom = elements.defaultSound.querySelector('option[data-custom="true"]');
+                if (oldCustom) oldCustom.remove();
+                
+                // Add new custom option with the uploaded file name
+                const option = document.createElement('option');
+                option.value = soundId;
+                option.textContent = `📁 ${shortenFileName(file.name, 15)}`;
+                option.title = file.name;
+                option.setAttribute('data-custom', 'true');
+                elements.defaultSound.appendChild(option);
+                elements.defaultSound.value = soundId;
+            }
         } else {
-            elements.customSound.value = soundId;
+            // Update timer creation dropdown
+            if (elements.customSound) {
+                // Remove old custom option if exists
+                const oldCustom = elements.customSound.querySelector('option[data-custom="true"]');
+                if (oldCustom) oldCustom.remove();
+                
+                // Add new custom option with the uploaded file name
+                const option = document.createElement('option');
+                option.value = soundId;
+                option.textContent = `📁 ${shortenFileName(file.name, 15)}`;
+                option.title = file.name;
+                option.setAttribute('data-custom', 'true');
+                elements.customSound.appendChild(option);
+                elements.customSound.value = soundId;
+            }
         }
+        
+        // Save custom sounds to localStorage
+        saveCustomSounds();
+        
+        // Play preview
+        playSoundByType(soundId);
     };
     reader.readAsDataURL(file);
 }
@@ -813,6 +918,16 @@ function createTimerCard(timer) {
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
         
+        // Build custom sound options
+        let customSoundOptions = '';
+        Object.keys(customSounds).forEach(soundId => {
+            const selected = timer.customSound === soundId ? 'selected' : '';
+            const soundInfo = customSounds[soundId];
+            const soundName = typeof soundInfo === 'object' ? soundInfo.name : 'Custom Sound';
+            const displayName = shortenFileName(soundName, 15);
+            customSoundOptions += `<option value="${soundId}" ${selected} title="${soundName}">📁 ${displayName}</option>`;
+        });
+        
         card.innerHTML = `
             <div class="select-checkbox"></div>
             <div class="timer-edit-form">
@@ -827,22 +942,29 @@ function createTimerCard(timer) {
                     <input type="number" class="edit-time-input edit-seconds" min="0" max="59" value="${seconds}" placeholder="SS">
                 </div>
                 <div class="edit-sound-controls">
+                    <div class="sound-row-top">
+                        <select class="edit-sound-select" ${!timer.soundOn ? 'disabled' : ''}>
+                            <option value="">Beep</option>
+                            <option value="bell" ${timer.customSound === 'bell' ? 'selected' : ''}>🔔 ${translations[currentLang].bell || 'Chuông'}</option>
+                            <option value="chime" ${timer.customSound === 'chime' ? 'selected' : ''}>🎵 Chime</option>
+                            <option value="ding" ${timer.customSound === 'ding' ? 'selected' : ''}>🔊 Ding</option>
+                            <option value="tick" ${timer.customSound === 'tick' ? 'selected' : ''}>⏱️ ${translations[currentLang].tick || 'Tick (3s cuối)'}</option>
+                            ${customSoundOptions}
+                            <option value="upload-new">📁 ${translations[currentLang].customFile || 'Tải âm thanh lên'}</option>
+                        </select>
+                        <button class="btn btn-tiny btn-secondary edit-test-sound-btn" ${!timer.soundOn ? 'disabled' : ''}>▶️</button>
+                    </div>
+                </div>
+                <input type="file" class="edit-sound-file-input hidden" accept="audio/*">
+                <div class="edit-actions">
                     <label class="checkbox-label">
                         <input type="checkbox" class="edit-sound-toggle" ${timer.soundOn ? 'checked' : ''}>
                         <span>🔊</span>
                     </label>
-                    <select class="edit-sound-select" ${!timer.soundOn ? 'disabled' : ''}>
-                        <option value="">Beep</option>
-                        <option value="bell" ${timer.customSound === 'bell' ? 'selected' : ''}>🔔 ${translations[currentLang].bell || 'Chuông'}</option>
-                        <option value="chime" ${timer.customSound === 'chime' ? 'selected' : ''}>🎵 Chime</option>
-                        <option value="ding" ${timer.customSound === 'ding' ? 'selected' : ''}>🔊 Ding</option>
-                        <option value="tick" ${timer.customSound === 'tick' ? 'selected' : ''}>⏱️ ${translations[currentLang].tick || 'Tick (3s cuối)'}</option>
-                    </select>
-                    <button class="btn btn-tiny btn-secondary edit-test-sound-btn" ${!timer.soundOn ? 'disabled' : ''}>▶️</button>
-                </div>
-                <div class="edit-actions">
-                    <button class="btn btn-secondary btn-tiny cancel-edit-btn">${translations[currentLang].cancel}</button>
-                    <button class="btn btn-primary btn-tiny save-edit-btn">${translations[currentLang].save}</button>
+                    <div class="edit-buttons-group">
+                        <button class="btn btn-secondary btn-tiny cancel-edit-btn">${translations[currentLang].cancel}</button>
+                        <button class="btn btn-primary btn-tiny save-edit-btn">${translations[currentLang].save}</button>
+                    </div>
                 </div>
             </div>
         `;
@@ -982,6 +1104,55 @@ function bindTimerCardEvents(card, timer, isEditing) {
         const soundToggle = card.querySelector('.edit-sound-toggle');
         const soundSelect = card.querySelector('.edit-sound-select');
         const testSoundBtn = card.querySelector('.edit-test-sound-btn');
+        const soundFileInput = card.querySelector('.edit-sound-file-input');
+        
+        // Sound select change handler - trigger file upload for "upload-new"
+        soundSelect?.addEventListener('change', (e) => {
+            if (e.target.value === 'upload-new') {
+                soundFileInput?.click();
+            }
+        });
+        
+        // File upload handler
+        soundFileInput?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const soundData = event.target.result;
+                    const soundId = `custom_${Date.now()}`;
+                    customSounds[soundId] = {
+                        data: soundData,
+                        name: file.name
+                    };
+                    saveCustomSounds();
+                    
+                    // Add new option to dropdown
+                    const option = document.createElement('option');
+                    option.value = soundId;
+                    option.textContent = `📁 ${shortenFileName(file.name, 15)}`;
+                    option.title = file.name;
+                    option.setAttribute('data-custom', 'true');
+                    
+                    // Insert before "upload-new" option
+                    const uploadNewOption = soundSelect.querySelector('option[value="upload-new"]');
+                    if (uploadNewOption) {
+                        soundSelect.insertBefore(option, uploadNewOption);
+                    } else {
+                        soundSelect.appendChild(option);
+                    }
+                    
+                    // Select the newly uploaded sound
+                    soundSelect.value = soundId;
+                    
+                    // Play preview
+                    playSoundByType(soundId);
+                };
+                reader.readAsDataURL(file);
+            }
+            // Reset file input
+            e.target.value = '';
+        });
         
         // Sound toggle handler
         soundToggle?.addEventListener('change', (e) => {
@@ -1180,6 +1351,18 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function shortenFileName(fileName, maxLength = 12) {
+    if (fileName.length <= maxLength) return fileName;
+    
+    const ext = fileName.substring(fileName.lastIndexOf('.'));
+    const nameWithoutExt = fileName.substring(0, fileName.lastIndexOf('.'));
+    const availableLength = maxLength - ext.length - 3; // 3 for "..."
+    
+    if (availableLength <= 0) return fileName.substring(0, maxLength - 3) + '...';
+    
+    return nameWithoutExt.substring(0, availableLength) + '...' + ext;
 }
 
 // ===== Timer Actions =====
@@ -2884,6 +3067,7 @@ function init() {
     try {
         loadTimers();
         loadPresets();
+        loadCustomSounds();
         
         // Load saved language
         const savedLang = localStorage.getItem('eiu_timer_lang');
