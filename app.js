@@ -666,7 +666,9 @@ function playTickSound() {
 function playSoundByType(soundType) {
     // Resume audio context if suspended (browser autoplay policy)
     if (audioContext.state === 'suspended') {
-        audioContext.resume();
+        audioContext.resume().catch(e => {
+            console.error('Failed to resume audio context:', e);
+        });
     }
     
     if (!soundType || soundType === '') {
@@ -686,7 +688,10 @@ function playSoundByType(soundType) {
     } else if (customSounds[soundType]) {
         // Custom uploaded sound
         const audio = new Audio(customSounds[soundType]);
-        audio.play().catch(() => playBeep());
+        audio.play().catch(err => {
+            console.error('Failed to play custom sound:', err);
+            playBeep(); // Fallback to beep
+        });
     } else {
         playBeep();
     }
@@ -2872,15 +2877,22 @@ function init() {
         initWorker();
         requestNotificationPermission();
         
-        // Resume audio context on first user interaction
+        // Resume audio context on first user interaction (important for mobile)
         const resumeAudio = () => {
             if (audioContext.state === 'suspended') {
-                audioContext.resume();
+                audioContext.resume().then(() => {
+                    console.log('AudioContext resumed - sound is now enabled');
+                }).catch(e => {
+                    console.error('Failed to resume AudioContext:', e);
+                });
             }
+            // Remove all listeners after first interaction
             document.removeEventListener('click', resumeAudio);
+            document.removeEventListener('touchstart', resumeAudio);
             document.removeEventListener('keydown', resumeAudio);
         };
         document.addEventListener('click', resumeAudio);
+        document.addEventListener('touchstart', resumeAudio); // Mobile support
         document.addEventListener('keydown', resumeAudio);
         
         console.log('App initialized successfully');
