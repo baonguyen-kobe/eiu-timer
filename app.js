@@ -763,8 +763,8 @@ function createTimerCard(timer) {
     if (timer.isRunning) card.classList.add('running');
     if (selectedTimers.has(timer.id)) card.classList.add('selected');
     
-    // Check if card is in edit mode
-    const isEditing = timer.__editing;
+    // Check if card is in edit mode - force false to prevent stuck editing state
+    const isEditing = false; // timer.__editing;
     
     // Calculate initial display time components
     let totalMs = 0;
