@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Timer Pro - Quản Lý Thời Gian</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏰</text></svg">
@@ -31,10 +34,8 @@
                 </button>
                 <div class="toolbar-divider"></div>
                 <button id="presentSelectedBtn" class="btn btn-tiny btn-primary" title="Trình chiếu">
-                    <span>📺</span> Trình chiếu
                 </button>
                 <button id="deleteSelectedBtn" class="btn btn-tiny btn-danger" title="Xóa đã chọn">
-                    <span>🗑️</span> Xóa
                 </button>
             </div>
             
@@ -49,9 +50,9 @@
                     Mẫu
                 </button>
                 <button id="settingsBtn" class="btn btn-secondary" title="Cài đặt">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <circle cx="8" cy="8" r="3"/>
-                        <path d="M8 1v2m0 10v2M1 8h2m10 0h2m-2.5-5.5l-1.4 1.4m-7.2 7.2l-1.4 1.4m10-10l1.4 1.4m-10 7.2l1.4 1.4"/>
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="10" cy="10" r="3"/>
+                        <path d="M10.3 3a1.5 1.5 0 0 0-2.8-.8l-.5.9a1.5 1.5 0 0 1-1.3.8h-1a1.5 1.5 0 0 0-1.5 1.5v.5c0 .6-.3 1.1-.8 1.3l-.9.5a1.5 1.5 0 0 0 0 2.6l.9.5c.5.2.8.7.8 1.3v.5c0 .8.7 1.5 1.5 1.5h1c.6 0 1.1.3 1.3.8l.5.9a1.5 1.5 0 0 0 2.6 0l.5-.9c.2-.5.7-.8 1.3-.8h1c.8 0 1.5-.7 1.5-1.5v-.5c0-.6.3-1.1.8-1.3l.9-.5a1.5 1.5 0 0 0 0-2.6l-.9-.5a1.5 1.5 0 0 1-.8-1.3v-.5c0-.8-.7-1.5-1.5-1.5h-1a1.5 1.5 0 0 1-1.3-.8l-.5-.9z"/>
                     </svg>
                     Cài đặt
                 </button>
@@ -92,12 +93,11 @@
     <!-- Quick Templates Section -->
     <section class="presets-bar" id="quickTemplates">
         <div class="container">
-            <div class="presets-header">
+            <div class="presets-inline">
                 <h3 id="quickTemplatesTitle">⚡ Mẫu Nhanh</h3>
-            </div>
-            <div class="presets-grid" id="quickPresetsGrid">
-                <!-- Quick preset templates -->
-                <button class="preset-card" data-preset="countdown-1m">
+                <div class="presets-grid" id="quickPresetsGrid">
+                    <!-- Quick preset templates -->
+                    <button class="preset-card" data-preset="countdown-1m">
                     <span class="preset-icon">
                         <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
                             <path d="M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12z"/>
@@ -135,6 +135,7 @@
                     </span>
                     <span class="preset-name" data-key="presetCountup3m">Đếm Lên 3m</span>
                 </button>
+                </div>
             </div>
         </div>
     </section>
@@ -226,6 +227,44 @@
                         </div>
                     </div>
                     <small class="form-hint" id="timeHint">Thời gian đếm ngược</small>
+                </div>
+
+                <!-- Target Time for Count Up (hidden by default) -->
+                <div class="form-group" id="targetTimeGroup" style="display: none;">
+                    <label><span id="targetTimeLabelText">Mục Tiêu (Tùy chọn)</span></label>
+                    <div class="time-inputs-grid">
+                        <div class="time-input-group">
+                            <div class="time-input-wrapper">
+                                <svg class="time-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <circle cx="8" cy="8" r="6"/>
+                                    <path d="M8 5v3l2 2"/>
+                                </svg>
+                                <input type="number" id="targetHours" class="form-control time-input" min="0" max="99" step="1" value="0">
+                            </div>
+                            <label class="time-label">Giờ</label>
+                        </div>
+                        <div class="time-input-group">
+                            <div class="time-input-wrapper">
+                                <svg class="time-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <circle cx="8" cy="8" r="6"/>
+                                    <path d="M8 4v4l3 2"/>
+                                </svg>
+                                <input type="number" id="targetMinutes" class="form-control time-input" min="0" max="59" step="1" value="0">
+                            </div>
+                            <label class="time-label">Phút</label>
+                        </div>
+                        <div class="time-input-group">
+                            <div class="time-input-wrapper">
+                                <svg class="time-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <circle cx="8" cy="8" r="6"/>
+                                    <path d="M8 3v5"/>
+                                </svg>
+                                <input type="number" id="targetSeconds" class="form-control time-input" min="0" max="59" step="1" value="0">
+                            </div>
+                            <label class="time-label">Giây</label>
+                        </div>
+                    </div>
+                    <small class="form-hint" id="targetTimeHint">Thời gian mục tiêu để kết thúc. Để trống nếu đếm vô hạn.</small>
                 </div>
 
                 <div class="form-group">
@@ -455,9 +494,46 @@
         Nhấn <kbd>?</kbd> để xem phím tắt
     </div>
 
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="shortcutsModal" class="modal" role="dialog" aria-hidden="true">
+        <div class="modal-overlay" id="shortcutsModalOverlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⌨️ Phím Tắt</h2>
+                <button class="modal-close" id="shortcutsModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="shortcuts-list">
+                    <div class="shortcut-item">
+                        <kbd>N</kbd>
+                        <span>Tạo timer mới</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>P</kbd>
+                        <span>Toggle presets</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Esc</kbd>
+                        <span>Đóng modal / Thoát presentation</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>?</kbd>
+                        <span>Xem phím tắt</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Presentation Mode -->
     <div id="presentationMode" class="presentation-mode hidden">
         <div class="presentation-header">
+            <button id="fullscreenToggleBtn" class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                </svg>
+                <span class="fullscreen-text">Toàn màn hình</span>
+            </button>
             <button id="exitPresentationBtn" class="btn btn-secondary">
                 <span>✕</span> Thoát Trình Chiếu
             </button>
