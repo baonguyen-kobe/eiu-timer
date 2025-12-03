@@ -506,9 +506,16 @@ function initWorker() {
 }
 
 // ===== Audio Functions =====
-const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+let audioContext;
+try {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+} catch (e) {
+    console.warn('AudioContext not supported:', e);
+}
 
 function playBeep() {
+    if (!audioContext) return;
+    
     // Resume audio context if suspended (browser autoplay policy)
     if (audioContext.state === 'suspended') {
         audioContext.resume();
@@ -536,6 +543,8 @@ function playBeep() {
 }
 
 function playBell() {
+    if (!audioContext) return;
+    
     if (audioContext.state === 'suspended') {
         audioContext.resume();
     }
@@ -562,6 +571,8 @@ function playBell() {
 }
 
 function playChime() {
+    if (!audioContext) return;
+    
     if (audioContext.state === 'suspended') {
         audioContext.resume();
     }
@@ -591,6 +602,8 @@ function playChime() {
 }
 
 function playDing() {
+    if (!audioContext) return;
+    
     if (audioContext.state === 'suspended') {
         audioContext.resume();
     }
@@ -617,6 +630,8 @@ function playDing() {
 }
 
 function playTickSound() {
+    if (!audioContext) return;
+    
     if (audioContext.state === 'suspended') {
         audioContext.resume();
     }
@@ -664,6 +679,8 @@ function playTickSound() {
 }
 
 function playSoundByType(soundType) {
+    if (!audioContext) return;
+    
     // Resume audio context if suspended (browser autoplay policy)
     if (audioContext.state === 'suspended') {
         audioContext.resume().catch(e => {
@@ -1054,9 +1071,11 @@ function updateTimerCard(id, snapshot) {
     if (!timer) return;
     
     // Update both normal and presentation card if they exist
-    const cards = [timer.__el, timer.__el_presentation].filter(Boolean);
+    const cards = [timer.__el, timer.__el_presentation].filter(el => el && el.querySelector);
     
     cards.forEach(card => {
+        if (!card || typeof card.querySelector !== 'function') return;
+        
         const hoursEl = card.querySelector('[data-unit="hours"]');
         const minutesEl = card.querySelector('[data-unit="minutes"]');
         const secondsEl = card.querySelector('[data-unit="seconds"]');
@@ -2879,6 +2898,8 @@ function init() {
         
         // Resume audio context on first user interaction (important for mobile)
         const resumeAudio = () => {
+            if (!audioContext) return;
+            
             if (audioContext.state === 'suspended') {
                 audioContext.resume().then(() => {
                     console.log('AudioContext resumed - sound is now enabled');
