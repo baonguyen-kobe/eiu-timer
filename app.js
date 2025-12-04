@@ -115,6 +115,22 @@ const translations = {
         emptyStateBtn: 'Tạo Bộ Đếm Đầu Tiên',
         fullscreen: 'Toàn màn hình',
         exitFullscreen: 'Thoát toàn màn hình',
+        miniWindow: 'Cửa Sổ Nhỏ',
+        exitPresentation: 'Thoát Trình Chiếu',
+        noTimerRunningOrSelected: 'Không có timer nào đang chạy hoặc được chọn!',
+        pleaseSelectTimer: 'Vui lòng chọn ít nhất một timer hoặc bắt đầu một timer!',
+        errorCreatingTimer: 'Có lỗi khi tạo timer từ mẫu. Vui lòng thử lại.',
+        appError: 'Có lỗi khi khởi động ứng dụng. Vui lòng kiểm tra console (F12) để xem chi tiết.',
+        run: 'Chạy',
+        stop: 'Dừng',
+        keyboardShortcuts: 'Phím Tắt',
+        shortcutNewTimer: 'Tạo timer mới',
+        shortcutTogglePresets: 'Toggle presets',
+        shortcutCloseModal: 'Đóng modal / Thoát presentation',
+        shortcutViewShortcuts: 'Xem phím tắt',
+        shortcutsHint: 'Nhấn',
+        shortcutsHintEnd: 'để xem phím tắt',
+        closeMiniWindow: 'Đóng cửa sổ nhỏ',
     },
     en: {
         appTitle: 'EIU Timer Pro',
@@ -224,6 +240,22 @@ const translations = {
         emptyStateBtn: 'Create Your First Timer',
         fullscreen: 'Fullscreen',
         exitFullscreen: 'Exit fullscreen',
+        miniWindow: 'Mini Window',
+        exitPresentation: 'Exit Presentation',
+        noTimerRunningOrSelected: 'No timer is running or selected!',
+        pleaseSelectTimer: 'Please select at least one timer or start a timer!',
+        errorCreatingTimer: 'Error creating timer from template. Please try again.',
+        appError: 'Error starting the app. Please check console (F12) for details.',
+        run: 'Run',
+        stop: 'Stop',
+        keyboardShortcuts: 'Keyboard Shortcuts',
+        shortcutNewTimer: 'Create new timer',
+        shortcutTogglePresets: 'Toggle presets',
+        shortcutCloseModal: 'Close modal / Exit presentation',
+        shortcutViewShortcuts: 'View shortcuts',
+        shortcutsHint: 'Press',
+        shortcutsHintEnd: 'to view shortcuts',
+        closeMiniWindow: 'Close mini window',
     }
 };
 
@@ -290,6 +322,14 @@ const elements = {
     exitPresentationBtn: document.getElementById('exitPresentationBtn'),
     fullscreenToggleBtn: document.getElementById('fullscreenToggleBtn'),
     presentationGrid: document.getElementById('presentationGrid'),
+    miniWindowBtn: document.getElementById('miniWindowBtn'),
+    miniWindowBtnOutside: document.getElementById('miniWindowBtnOutside'),
+    
+    // Mini Timer Window
+    miniTimerWindow: document.getElementById('miniTimerWindow'),
+    closeMiniWindowBtn: document.getElementById('closeMiniWindowBtn'),
+    miniTimerBody: document.getElementById('miniTimerBody'),
+    miniTimerTitle: document.getElementById('miniTimerTitle'),
     
     // Shortcuts Modal
     shortcutsModal: document.getElementById('shortcutsModal'),
@@ -974,6 +1014,12 @@ function createTimerCard(timer) {
             <div class="select-checkbox"></div>
             <div class="timer-header">
                 <div class="timer-actions">
+                    <button class="btn btn-tiny btn-secondary mini-window-btn" title="Cửa sổ nhỏ">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <rect x="9" y="9" width="6" height="6" rx="1"/>
+                        </svg>
+                    </button>
                     <button class="btn btn-tiny btn-secondary present-btn" title="${translations[currentLang].present}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
@@ -1220,6 +1266,7 @@ function bindTimerCardEvents(card, timer, isEditing) {
         const editBtn = card.querySelector('.edit-btn');
         const deleteBtn = card.querySelector('.delete-btn');
         const presentBtn = card.querySelector('.present-btn');
+        const miniWindowBtn = card.querySelector('.mini-window-btn');
         const soundToggle = card.querySelector('.sound-toggle');
         const adjBtns = card.querySelectorAll('.adj-btn');
         
@@ -1229,6 +1276,7 @@ function bindTimerCardEvents(card, timer, isEditing) {
         editBtn?.addEventListener('click', () => handleInlineEdit(timer.id));
         deleteBtn?.addEventListener('click', () => handleDelete(timer.id));
         presentBtn?.addEventListener('click', () => handlePresentSingle(timer.id));
+        miniWindowBtn?.addEventListener('click', () => handleOpenSingleMiniWindow(timer.id));
         soundToggle?.addEventListener('change', (e) => {
             timer.soundOn = e.target.checked;
             saveTimers();
@@ -1462,6 +1510,16 @@ function handleDelete(id) {
     // Remove from selection if selected
     selectedTimers.delete(id);
     updateSelectionToolbar();
+    
+    // Update mini window if open - remove deleted timer
+    if (!elements.miniTimerWindow.classList.contains('hidden')) {
+        miniWindowTimers = miniWindowTimers.filter(t => t.id !== id);
+        if (miniWindowTimers.length === 0) {
+            closeMiniTimerWindow();
+        } else {
+            renderMiniTimerWindow();
+        }
+    }
     
     renderAllTimers();
 }
@@ -1789,8 +1847,21 @@ function handleTick(payload) {
     const { updates } = payload;
     
     updates.forEach(update => {
+        const timer = timers.get(update.id);
+        if (timer) {
+            // Update timer object with latest values from worker
+            timer.isRunning = update.isRunning;
+            if (update.mode === 'countdown') {
+                timer.lastRemaining = update.remaining;
+            } else {
+                timer.lastElapsed = update.elapsed;
+            }
+        }
         updateTimerCard(update.id, update);
     });
+    
+    // Update mini timer window if open
+    updateMiniTimerWindow();
     
     // Periodically save state
     saveTimers();
@@ -2092,6 +2163,19 @@ function handleFormSubmit(e) {
             saveTimers();
             renderAllTimers();
             initWorker();
+            
+            // Update mini window if this timer is displayed there
+            if (!elements.miniTimerWindow.classList.contains('hidden')) {
+                const timerInMini = miniWindowTimers.find(t => t.id === editingId);
+                if (timerInMini) {
+                    // Update the reference in miniWindowTimers
+                    const idx = miniWindowTimers.findIndex(t => t.id === editingId);
+                    if (idx !== -1) {
+                        miniWindowTimers[idx] = timer;
+                    }
+                    renderMiniTimerWindow();
+                }
+            }
             
             console.log('Timer updated successfully');
         } catch (err) {
@@ -2485,9 +2569,14 @@ function updateLanguage() {
         timeLabels[2].textContent = t.seconds;
     }
     
-    // Update sound checkbox label
-    const enableSoundLabel = document.querySelector('label[for="enableSound"] span');
-    if (enableSoundLabel) enableSoundLabel.innerHTML = '🔊 ' + t.enableSound;
+    // Update sound checkbox label (checkbox is inside label, span is sibling)
+    const enableSoundCheckbox = document.querySelector('#enableSound');
+    if (enableSoundCheckbox) {
+        const enableSoundLabel = enableSoundCheckbox.nextElementSibling;
+        if (enableSoundLabel && enableSoundLabel.tagName === 'SPAN') {
+            enableSoundLabel.innerHTML = '🔊 ' + t.enableSound;
+        }
+    }
     
     // Update custom sound label
     const customSoundLabel = document.querySelector('label[for="customSound"]');
@@ -2511,9 +2600,14 @@ function updateLanguage() {
         if (text.nodeType === 3) text.textContent = ' ' + t.testSound;
     });
     
-    // Update notification checkbox label
-    const enableNotifLabel = document.querySelector('label[for="enableNotification"] span');
-    if (enableNotifLabel) enableNotifLabel.innerHTML = '🔔 ' + t.enableNotification;
+    // Update notification checkbox label (checkbox is inside label, span is sibling)
+    const enableNotifCheckbox = document.querySelector('#enableNotification');
+    if (enableNotifCheckbox) {
+        const enableNotifLabel = enableNotifCheckbox.nextElementSibling;
+        if (enableNotifLabel && enableNotifLabel.tagName === 'SPAN') {
+            enableNotifLabel.innerHTML = '🔔 ' + t.enableNotification;
+        }
+    }
     
     // Update form buttons
     const cancelBtn = document.querySelector('#cancelBtn');
@@ -2604,8 +2698,14 @@ function updateLanguage() {
     const notificationTitle = document.querySelector('#settingsModal .settings-section:nth-child(3) h3');
     if (notificationTitle) notificationTitle.textContent = t.notificationTitle;
     
-    const notificationDefaultLabel = document.querySelector('label[for="enableNotificationsByDefault"] span');
-    if (notificationDefaultLabel) notificationDefaultLabel.textContent = t.notificationDefault;
+    // Fix selector for checkbox inside label (checkbox is inside label, span is sibling)
+    const notificationDefaultCheckbox = document.querySelector('#enableNotificationsByDefault');
+    if (notificationDefaultCheckbox) {
+        const notificationDefaultLabel = notificationDefaultCheckbox.nextElementSibling;
+        if (notificationDefaultLabel && notificationDefaultLabel.tagName === 'SPAN') {
+            notificationDefaultLabel.textContent = t.notificationDefault;
+        }
+    }
     
     // Update Stats Modal
     const statsModalTitle = document.querySelector('#statsModal h2');
@@ -2618,6 +2718,41 @@ function updateLanguage() {
         statLabels[2].textContent = t.completedToday;
         statLabels[3].textContent = t.totalFocusTime;
     }
+    
+    // Update Presentation Mode buttons
+    const miniWindowBtn = document.querySelector('#miniWindowBtn span');
+    if (miniWindowBtn) miniWindowBtn.textContent = t.miniWindow;
+    
+    const fullscreenToggleBtn = document.querySelector('#fullscreenToggleBtn .fullscreen-text');
+    if (fullscreenToggleBtn) fullscreenToggleBtn.textContent = t.fullscreen;
+    
+    const exitPresentationBtn = document.querySelector('#exitPresentationBtn');
+    if (exitPresentationBtn) {
+        const spanText = exitPresentationBtn.childNodes[exitPresentationBtn.childNodes.length - 1];
+        if (spanText.nodeType === 3) spanText.textContent = ' ' + t.exitPresentation;
+    }
+    
+    // Update Keyboard Shortcuts Modal
+    const shortcutsModalTitle = document.querySelector('#shortcutsModal h2');
+    if (shortcutsModalTitle) shortcutsModalTitle.textContent = '⌨️ ' + t.keyboardShortcuts;
+    
+    const shortcutItems = document.querySelectorAll('#shortcutsModal .shortcut-item');
+    if (shortcutItems.length >= 4) {
+        shortcutItems[0].querySelector('span').textContent = t.shortcutNewTimer;
+        shortcutItems[1].querySelector('span').textContent = t.shortcutTogglePresets;
+        shortcutItems[2].querySelector('span').textContent = t.shortcutCloseModal;
+        shortcutItems[3].querySelector('span').textContent = t.shortcutViewShortcuts;
+    }
+    
+    // Update shortcuts hint at bottom
+    const shortcutsHint = document.querySelector('.shortcuts-hint');
+    if (shortcutsHint) {
+        shortcutsHint.innerHTML = t.shortcutsHint + ' <kbd>?</kbd> ' + t.shortcutsHintEnd;
+    }
+    
+    // Update mini window close button title
+    const closeMiniWindowBtn = document.querySelector('#closeMiniWindowBtn');
+    if (closeMiniWindowBtn) closeMiniWindowBtn.title = t.closeMiniWindow;
     
     // Re-render everything with new language
     renderAllTimers();
@@ -2692,8 +2827,14 @@ function showSettings() {
     const notificationTitle = document.querySelector('#settingsModal .settings-section:nth-child(3) h3');
     if (notificationTitle) notificationTitle.textContent = t.notificationTitle;
     
-    const notificationDefaultLabel = document.querySelector('label[for="enableNotificationsByDefault"] span');
-    if (notificationDefaultLabel) notificationDefaultLabel.textContent = t.notificationDefault;
+    // Fix selector for checkbox inside label (checkbox is inside label, span is sibling)
+    const notificationDefaultCheckbox = document.querySelector('#enableNotificationsByDefault');
+    if (notificationDefaultCheckbox) {
+        const notificationDefaultLabel = notificationDefaultCheckbox.nextElementSibling;
+        if (notificationDefaultLabel && notificationDefaultLabel.tagName === 'SPAN') {
+            notificationDefaultLabel.textContent = t.notificationDefault;
+        }
+    }
     
     showModal(elements.settingsModal);
 }
@@ -2882,6 +3023,9 @@ function setupEventListeners() {
     // Presentation Mode
     elements.exitPresentationBtn.addEventListener('click', exitPresentationMode);
     elements.fullscreenToggleBtn.addEventListener('click', toggleFullscreen);
+    elements.miniWindowBtn.addEventListener('click', openMiniTimerWindow);
+    elements.miniWindowBtnOutside?.addEventListener('click', openMiniTimerWindowOutside);
+    elements.closeMiniWindowBtn.addEventListener('click', closeMiniTimerWindow);
     
     // Sound Controls
     elements.enableSound.addEventListener('change', (e) => {
@@ -3058,8 +3202,377 @@ function handleDefaultPreset(presetType) {
         renderAllTimers();
     } catch (error) {
         console.error('Error in handleDefaultPreset:', error);
-        alert('Có lỗi khi tạo timer từ mẫu. Vui lòng thử lại.');
+        alert(translations[currentLang].errorCreatingTimer);
     }
+}
+
+// ===== Mini Timer Window Functions =====
+let miniWindowTimers = [];
+let isDragging = false;
+let dragOffset = { x: 0, y: 0 };
+
+function openMiniTimerWindow() {
+    let presentationTimers = [];
+    
+    // If in presentation mode, get timers from presentation grid
+    if (!elements.presentationMode.classList.contains('hidden')) {
+        const presentationCards = elements.presentationGrid.querySelectorAll('.presentation-card');
+        presentationCards.forEach(card => {
+            const timerId = card.dataset.id;
+            const timer = timers.get(timerId);
+            if (timer) {
+                presentationTimers.push(timer);
+            }
+        });
+    }
+    
+    // If no presentation timers, try running or selected timers
+    if (presentationTimers.length === 0) {
+        presentationTimers = Array.from(timers.values()).filter(t => 
+            t.isRunning || selectedTimers.has(t.id)
+        );
+    }
+    
+    if (presentationTimers.length === 0) {
+        alert(translations[currentLang].noTimerRunningOrSelected);
+        return;
+    }
+    
+    // Exit presentation mode when opening mini window
+    if (!elements.presentationMode.classList.contains('hidden')) {
+        exitPresentationMode();
+    }
+    
+    miniWindowTimers = presentationTimers;
+    renderMiniTimerWindow();
+    elements.miniTimerWindow.classList.remove('hidden');
+    
+    // Initialize drag functionality
+    initMiniWindowDrag();
+}
+
+function openMiniTimerWindowOutside() {
+    // Get all running or selected timers
+    const activeTimers = Array.from(timers.values()).filter(t => 
+        t.isRunning || selectedTimers.has(t.id)
+    );
+    
+    if (activeTimers.length === 0) {
+        alert(translations[currentLang].pleaseSelectTimer);
+        return;
+    }
+    
+    // Exit presentation mode if active
+    if (!elements.presentationMode.classList.contains('hidden')) {
+        exitPresentationMode();
+    }
+    
+    miniWindowTimers = activeTimers;
+    renderMiniTimerWindow();
+    elements.miniTimerWindow.classList.remove('hidden');
+    
+    // Initialize drag functionality
+    initMiniWindowDrag();
+}
+
+// Open mini window for a single timer (from timer card button)
+function handleOpenSingleMiniWindow(id) {
+    const timer = timers.get(id);
+    if (!timer) return;
+    
+    // Exit presentation mode if active
+    if (!elements.presentationMode.classList.contains('hidden')) {
+        exitPresentationMode();
+    }
+    
+    miniWindowTimers = [timer];
+    renderMiniTimerWindow();
+    elements.miniTimerWindow.classList.remove('hidden');
+    
+    // Initialize drag functionality
+    initMiniWindowDrag();
+}
+
+function closeMiniTimerWindow() {
+    elements.miniTimerWindow.classList.add('hidden');
+    miniWindowTimers = [];
+}
+
+function renderMiniTimerWindow() {
+    const body = elements.miniTimerBody;
+    body.innerHTML = '';
+    
+    miniWindowTimers.forEach((timer, index) => {
+        // Get fresh timer data
+        const currentTimer = timers.get(timer.id);
+        if (!currentTimer) return;
+        
+        const card = document.createElement('div');
+        card.className = `mini-timer-card ${currentTimer.isRunning ? 'running' : ''}`;
+        card.dataset.timerId = currentTimer.id;
+        
+        // Get time values - use correct property names
+        let totalMs = 0;
+        if (currentTimer.mode === 'countdown') {
+            totalMs = currentTimer.lastRemaining ?? currentTimer.initialDuration ?? 0;
+        } else {
+            totalMs = (currentTimer.initialDuration ?? 0) + (currentTimer.lastElapsed ?? 0);
+        }
+        
+        const totalSeconds = Math.floor(Math.abs(totalMs) / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        
+        const hoursStr = String(hours).padStart(2, '0');
+        const minutesStr = String(minutes).padStart(2, '0');
+        const secondsStr = String(seconds).padStart(2, '0');
+        
+        // Calculate progress
+        let progress = 0;
+        if (timer.mode === 'countdown' && timer.initialDuration > 0) {
+            const remaining = timer.lastRemaining ?? timer.initialDuration ?? 0;
+            progress = Math.max(0, Math.min(100, ((timer.initialDuration - remaining) / timer.initialDuration) * 100));
+        } else if (timer.mode === 'countup' && timer.targetDuration > 0) {
+            const elapsed = timer.lastElapsed ?? 0;
+            progress = Math.min(100, (elapsed / timer.targetDuration) * 100);
+        }
+        
+        const t = translations[currentLang];
+        
+        card.innerHTML = `
+            <div class="mini-timer-name">${escapeHtml(currentTimer.name)}</div>
+            <div class="mini-timer-display">
+                <div class="mini-time-unit">
+                    <div class="mini-time-value">${hoursStr}</div>
+                    <div class="mini-time-label">${t.hours}</div>
+                </div>
+                <div class="mini-time-separator">:</div>
+                <div class="mini-time-unit">
+                    <div class="mini-time-value">${minutesStr}</div>
+                    <div class="mini-time-label">${t.minutes}</div>
+                </div>
+                <div class="mini-time-separator">:</div>
+                <div class="mini-time-unit">
+                    <div class="mini-time-value">${secondsStr}</div>
+                    <div class="mini-time-label">${t.seconds}</div>
+                </div>
+            </div>
+            <div class="mini-progress">
+                <div class="mini-progress-bar" style="width: ${progress}%"></div>
+            </div>
+            <div class="mini-timer-controls">
+                <button class="mini-btn mini-btn-play" data-action="toggle" data-timer-id="${currentTimer.id}">
+                    ${currentTimer.isRunning ? `
+                        <svg viewBox="0 0 16 16" fill="currentColor">
+                            <rect x="4" y="3" width="3" height="10" rx="1"/>
+                            <rect x="9" y="3" width="3" height="10" rx="1"/>
+                        </svg>
+                        ${t.stop}
+                    ` : `
+                        <svg viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M5 3l8 5-8 5V3z"/>
+                        </svg>
+                        ${t.run}
+                    `}
+                </button>
+                <button class="mini-btn mini-btn-reset" data-action="reset" data-timer-id="${currentTimer.id}">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M2 8a6 6 0 0 1 10-4.5M14 8a6 6 0 0 1-10 4.5"/>
+                        <path d="M12 3.5V1m0 2.5h2.5"/>
+                    </svg>
+                    ${t.reset}
+                </button>
+                <button class="mini-btn mini-btn-fullscreen" data-action="fullscreen" data-timer-id="${currentTimer.id}">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="2" width="12" height="9" rx="1"/>
+                        <path d="M5 14h6M8 11v3"/>
+                    </svg>
+                    ${t.fullscreen}
+                </button>
+            </div>
+        `;
+        
+        body.appendChild(card);
+    });
+    
+    // Add event listeners to mini buttons
+    body.querySelectorAll('.mini-btn').forEach(btn => {
+        btn.addEventListener('click', handleMiniButtonClick);
+    });
+    
+    // Update title
+    if (miniWindowTimers.length === 1) {
+        const firstTimer = timers.get(miniWindowTimers[0].id);
+        elements.miniTimerTitle.textContent = firstTimer ? firstTimer.name : 'Timer';
+    } else {
+        elements.miniTimerTitle.textContent = `${miniWindowTimers.length} Timers`;
+    }
+}
+
+function handleMiniButtonClick(e) {
+    const btn = e.currentTarget;
+    const action = btn.dataset.action;
+    const timerId = btn.dataset.timerId;
+    const timer = timers.get(timerId);
+    
+    if (!timer) return;
+    
+    if (action === 'toggle') {
+        if (timer.isRunning) {
+            handlePause(timerId);
+        } else {
+            handleStart(timerId);
+        }
+    } else if (action === 'reset') {
+        handleReset(timerId);
+    } else if (action === 'fullscreen') {
+        // Close mini window and enter presentation mode with this timer
+        closeMiniTimerWindow();
+        selectedTimers.clear();
+        selectedTimers.add(timerId);
+        updateSelectionToolbar();
+        // Enter presentation mode with the selected timer
+        enterPresentationMode([timer]);
+        // Also request fullscreen
+        requestFullscreen();
+        return; // Don't render mini window after this
+    }
+    
+    // Update mini window display
+    renderMiniTimerWindow();
+    // Update main display if visible
+    renderAllTimers();
+}
+
+function updateMiniTimerWindow() {
+    if (elements.miniTimerWindow.classList.contains('hidden')) return;
+    
+    miniWindowTimers.forEach(timer => {
+        const card = elements.miniTimerBody.querySelector(`[data-timer-id="${timer.id}"]`);
+        if (!card) return;
+        
+        // Get time values - use correct property names
+        let totalMs = 0;
+        if (timer.mode === 'countdown') {
+            totalMs = timer.lastRemaining ?? timer.initialDuration ?? 0;
+        } else {
+            totalMs = (timer.initialDuration ?? 0) + (timer.lastElapsed ?? 0);
+        }
+        
+        const totalSeconds = Math.floor(Math.abs(totalMs) / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        
+        const hoursStr = String(hours).padStart(2, '0');
+        const minutesStr = String(minutes).padStart(2, '0');
+        const secondsStr = String(seconds).padStart(2, '0');
+        
+        const values = card.querySelectorAll('.mini-time-value');
+        if (values.length >= 3) {
+            values[0].textContent = hoursStr;
+            values[1].textContent = minutesStr;
+            values[2].textContent = secondsStr;
+        }
+        
+        // Calculate progress
+        let progress = 0;
+        if (timer.mode === 'countdown' && timer.initialDuration > 0) {
+            const remaining = timer.lastRemaining ?? timer.initialDuration ?? 0;
+            progress = Math.max(0, Math.min(100, ((timer.initialDuration - remaining) / timer.initialDuration) * 100));
+        } else if (timer.mode === 'countup' && timer.targetDuration > 0) {
+            const elapsed = timer.lastElapsed ?? 0;
+            progress = Math.min(100, (elapsed / timer.targetDuration) * 100);
+        }
+        
+        const progressBar = card.querySelector('.mini-progress-bar');
+        if (progressBar) {
+            progressBar.style.width = `${progress}%`;
+        }
+        
+        // Update running state
+        if (timer.isRunning) {
+            card.classList.add('running');
+        } else {
+            card.classList.remove('running');
+        }
+        
+        // Update play/pause button
+        const toggleBtn = card.querySelector('[data-action="toggle"]');
+        if (toggleBtn) {
+            toggleBtn.innerHTML = timer.isRunning ? `
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                    <rect x="4" y="3" width="3" height="10" rx="1"/>
+                    <rect x="9" y="3" width="3" height="10" rx="1"/>
+                </svg>
+                Dừng
+            ` : `
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M5 3l8 5-8 5V3z"/>
+                </svg>
+                Chạy
+            `;
+        }
+    });
+}
+
+function initMiniWindowDrag() {
+    const dragHandle = elements.miniTimerWindow.querySelector('.mini-timer-drag-handle');
+    const window = elements.miniTimerWindow;
+    
+    if (!dragHandle) return;
+    
+    let startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
+    
+    dragHandle.addEventListener('mousedown', function(e) {
+        // Don't drag if clicking close button
+        if (e.target.closest('.mini-close-btn')) return;
+        
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        
+        const style = window.getBoundingClientRect();
+        initialLeft = style.left;
+        initialTop = style.top;
+        
+        dragHandle.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', function(e) {
+        if (!isDragging) return;
+        
+        e.preventDefault();
+        
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        
+        let newX = initialLeft + deltaX;
+        let newY = initialTop + deltaY;
+        
+        // Keep window within viewport bounds
+        const windowRect = window.getBoundingClientRect();
+        const maxX = document.documentElement.clientWidth - windowRect.width;
+        const maxY = document.documentElement.clientHeight - windowRect.height;
+        
+        newX = Math.max(0, Math.min(newX, maxX));
+        newY = Math.max(0, Math.min(newY, maxY));
+        
+        window.style.left = `${newX}px`;
+        window.style.top = `${newY}px`;
+        window.style.right = 'auto';
+    });
+    
+    document.addEventListener('mouseup', function() {
+        if (isDragging) {
+            isDragging = false;
+            if (dragHandle) {
+                dragHandle.style.cursor = 'move';
+            }
+        }
+    });
 }
 
 // ===== Initialization =====
@@ -3109,7 +3622,7 @@ function init() {
         console.log('App initialized successfully');
     } catch (error) {
         console.error('Initialization error:', error);
-        alert('Có lỗi khi khởi động ứng dụng. Vui lòng kiểm tra console (F12) để xem chi tiết.');
+        alert(translations[currentLang].appError);
     }
 }
 
